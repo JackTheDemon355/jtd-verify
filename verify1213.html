@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Search History Verification</title>
+  <!-- Tesseract.js CDN for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1a1a1a;
+      color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .card {
+      background-color: #2a2a2a;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      max-width: 450px;
+      width: 90%;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+    }
+
+    p {
+      color: #ccc;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .target-term {
+      color: #ff4757;
+      font-weight: bold;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .upload-btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background-color: #3742fa;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+
+    .upload-btn:hover {
+      background-color: #5352ed;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    .error {
+      color: #ff6b6b;
+    }
+
+    .success {
+      color: #2ed573;
+    }
+
+    .reward-btn {
+      display: inline-block;
+      margin-top: 15px;
+      padding: 12px 24px;
+      background-color: #2ed573;
+      color: #000;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+
+    .reward-btn:hover {
+      background-color: #26af5f;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Search History Verification</h1>
+    <p>
+      Please open your search history, ensure the query 
+      <span class="target-term">"JackTheDemon355"</span> is visible, take a screenshot, and upload it below.
+    </p>
+
+    <label for="imageInput" class="upload-btn">Upload Screenshot</label>
+    <input type="file" id="imageInput" accept="image/*" />
+
+    <div id="status"></div>
+    <div id="resultArea"></div>
+  </div>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const statusDiv = document.getElementById('status');
+    const resultArea = document.getElementById('resultArea');
+
+    const TARGET_TEXT = "jackthedemon355"; // Case-insensitive matching
+
+    imageInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Reset state
+      statusDiv.className = '';
+      statusDiv.textContent = 'Scanning image with OCR... Please wait.';
+      resultArea.innerHTML = '';
+
+      try {
+        // Run OCR scan using Tesseract.js
+        const worker = await Tesseract.createWorker('eng');
+        const ret = await worker.recognize(file);
+        await worker.terminate();
+
+        const extractedText = ret.data.text.toLowerCase();
+
+        // Check if the target text is included
+        if (extractedText.includes(TARGET_TEXT)) {
+          statusDiv.className = 'success';
+          statusDiv.textContent = 'Verification successful!';
+          
+          // Provide reward button
+          resultArea.innerHTML = `
+            <a href="https://youtu.be/SUJlKZNuxRY" target="_blank" class="reward-btn">
+              Visit the Video on YouTube
+            </a>
+          `;
+        } else {
+          statusDiv.className = 'error';
+          statusDiv.textContent = 'Verification failed. Target term not found. Try again.';
+        }
+      } catch (err) {
+        console.error(err);
+        statusDiv.className = 'error';
+        statusDiv.textContent = 'An error occurred while processing the image. Please try again.';
+      }
+    });
+  </script>
+
+</body>
+</html>
