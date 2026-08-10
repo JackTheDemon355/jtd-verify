@@ -115,8 +115,17 @@
     const statusDiv = document.getElementById('status');
     const resultArea = document.getElementById('resultArea');
 
-    const TARGET_TEXT = "jackthedemon355"; // Case-insensitive matching
-
+    const TARGET_TEXT = [
+      "jackthedemon355",
+      "jtd355",
+      "windows 11"
+      "win11"
+      "11"
+      "windows"
+      "window"
+      "w11"
+];
+    
     imageInput.addEventListener('change', async (event) => {
       const file = event.target.files[0];
       if (!file) return;
