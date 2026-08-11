@@ -4,11 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Search History Verification</title>
+
+  <!-- Raleway font from Google Fonts; Calibri is a system font (not hosted on Google Fonts) -->
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;700&display=swap" rel="stylesheet">
+
   <!-- Tesseract.js CDN for OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
   <style>
+    /* Use Calibri first (system), then Raleway, then fallbacks */
     body {
-      font-family: Arial, sans-serif;
+      font-family: "Calibri", "Raleway", Arial, sans-serif;
       background-color: #1a1a1a;
       color: #ffffff;
       display: flex;
@@ -24,13 +30,13 @@
       border-radius: 12px;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
       text-align: center;
-      max-width: 450px;
-      width: 90%;
+      max-width: 640px;
+      width: 94%;
     }
 
     h1 {
       font-size: 1.5rem;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
     }
 
     p {
@@ -50,7 +56,7 @@
 
     .upload-btn {
       display: inline-block;
-      margin-top: 20px;
+      margin-top: 18px;
       padding: 12px 24px;
       background-color: #3742fa;
       color: white;
@@ -65,7 +71,7 @@
     }
 
     #status {
-      margin-top: 20px;
+      margin-top: 18px;
       font-weight: bold;
     }
 
@@ -92,6 +98,48 @@
     .reward-btn:hover {
       background-color: #26af5f;
     }
+
+    #extractedText {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #ddd;
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-align: left;
+      background: rgba(255,255,255,0.03);
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 140px;
+      overflow: auto;
+    }
+
+    /* Progress bar styles */
+    .progress-container {
+      margin-top: 12px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 8px;
+      height: 14px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3742fa, #2ed573);
+      transition: width 120ms linear;
+    }
+
+    .progress-text {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: #bbb;
+    }
+
+    .small {
+      font-size: 0.85rem;
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
@@ -106,56 +154,199 @@
     <label for="imageInput" class="upload-btn">Upload Screenshot</label>
     <input type="file" id="imageInput" accept="image/*" />
 
-    <div id="status"></div>
+    <div id="status" class="small"></div>
+
+    <div class="progress-container" style="display:none;" aria-hidden="true">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+    <div id="progressText" class="progress-text" aria-live="polite"></div>
+
     <div id="resultArea"></div>
+    <div id="extractedText" aria-live="polite" style="display:none;"></div>
   </div>
 
  <script>
   const imageInput = document.getElementById('imageInput');
   const statusDiv = document.getElementById('status');
   const resultArea = document.getElementById('resultArea');
+  const extractedTextDiv = document.getElementById('extractedText');
+  const progressBar = document.getElementById('progressBar');
+  const progressContainer = document.querySelector('.progress-container');
+  const progressText = document.getElementById('progressText');
 
-  // Array of keywords (with correct commas)
+  // Array of keywords (lowercase)
   const TARGET_TEXTS = [
     "jackthedemon355",
     "jtd355",
     "windows 11",
     "w11"
   ];
-  
+
+  // Simple Levenshtein distance for fuzzy matching
+  function levenshtein(a, b) {
+    if (a === b) return 0;
+    const al = a.length;
+    const bl = b.length;
+    if (al === 0) return bl;
+    if (bl === 0) return al;
+    const matrix = Array.from({ length: al + 1 }, () => Array(bl + 1).fill(0));
+    for (let i = 0; i <= al; i++) matrix[i][0] = i;
+    for (let j = 0; j <= bl; j++) matrix[0][j] = j;
+    for (let i = 1; i <= al; i++) {
+      for (let j = 1; j <= bl; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        );
+      }
+    }
+    return matrix[al][bl];
+  }
+
+  // Normalize text: remove diacritics, punctuation (keep letters & numbers & spaces), collapse whitespace
+  function normalizeText(s) {
+    if (!s) return '';
+    // remove diacritics
+    let t = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    // replace non-alphanumeric with spaces
+    t = t.replace(/[^a-zA-Z0-9\s]/g, ' ');
+    // collapse whitespace
+    t = t.replace(/\s+/g, ' ').trim().toLowerCase();
+    return t;
+  }
+
+  // Replace common OCR confusions (0<->o, 1<->l, 5<->s)
+  function ocrNormalizeConfusions(s) {
+    return s
+      .replace(/0/g, 'o')
+      .replace(/\b1\b/g, '1') // keep standalone 1 as-is
+      .replace(/1/g, 'l')
+      .replace(/5/g, 's')
+      .replace(/\$/g, 's');
+  }
+
+  // Try approximate match: direct substring, token n-grams, and fuzzy (levenshtein) checks
+  function approximateMatch(extracted, target) {
+    if (!extracted || !target) return false;
+    const normExtracted = normalizeText(extracted);
+    const normTarget = normalizeText(target);
+    // direct substring
+    if (normExtracted.includes(normTarget)) return true;
+
+    // try OCR confusion mappings
+    const mapped = ocrNormalizeConfusions(normExtracted);
+    if (mapped.includes(normTarget)) return true;
+
+    // split into tokens
+    const tokens = normExtracted.split(' ');
+    const maxN = Math.min(4, tokens.length);
+    const threshold = Math.max(1, Math.floor(normTarget.length * 0.25)); // allow ~25% errors
+
+    // build n-grams and compare
+    for (let n = 1; n <= maxN; n++) {
+      for (let i = 0; i + n <= tokens.length; i++) {
+        const candidate = tokens.slice(i, i + n).join(''); // join without spaces
+        // direct equality
+        if (candidate === normTarget) return true;
+        const dist = levenshtein(candidate, normTarget);
+        if (dist <= threshold) return true;
+      }
+    }
+
+    // As a last resort compare full text with target
+    const fullDist = levenshtein(normExtracted.replace(/\s+/g, ''), normTarget);
+    if (fullDist <= threshold) return true;
+
+    return false;
+  }
+
   imageInput.addEventListener('change', async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     // Reset state
     statusDiv.className = '';
-    statusDiv.textContent = 'Scanning image with OCR... Please wait.';
+    statusDiv.textContent = 'Preparing image for OCR...';
     resultArea.innerHTML = '';
+    extractedTextDiv.style.display = 'none';
+    extractedTextDiv.textContent = '';
+    progressBar.style.width = '0%';
+    progressContainer.style.display = 'none';
+    progressText.textContent = '';
 
     try {
-      // Run OCR scan using Tesseract.js
-      const worker = await Tesseract.createWorker('eng');
-      const ret = await worker.recognize(file);
+      // Create a blob URL and pass that to Tesseract (more reliable)
+      const imageUrl = URL.createObjectURL(file);
+
+      // Create worker and follow Tesseract.js v5 initialization flow
+      const worker = Tesseract.createWorker();
+
+      // Set a logger to update progress UI
+      if (worker.setLogger) {
+        worker.setLogger((m) => {
+          // m: { status, progress }
+          try {
+            if (m && typeof m === 'object' && 'progress' in m) {
+              const pct = Math.round((m.progress || 0) * 100);
+              progressContainer.style.display = 'block';
+              progressBar.style.width = pct + '%';
+              progressText.textContent = (m.status || 'processing') + ' — ' + pct + '%';
+              statusDiv.textContent = (m.status || 'processing') + ' — ' + pct + '%';
+            }
+          } catch (e) {
+            // ignore UI errors
+          }
+        });
+      }
+
+      await worker.load();
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+
+      // Make recognition call; Tesseract will call the logger we set above
+      const { data: { text } } = await worker.recognize(imageUrl);
+
+      // Clean up worker and blob URL
       await worker.terminate();
+      URL.revokeObjectURL(imageUrl);
 
-      const extractedText = ret.data.text.toLowerCase();
+      const extractedTextRaw = text || '';
 
-      // Check if ANY keyword matches the extracted text
-      const hasMatch = TARGET_TEXTS.some(term => extractedText.includes(term));
+      // Show the extracted text for debugging/visibility
+      extractedTextDiv.style.display = 'block';
+      extractedTextDiv.textContent = 'Extracted text:\n' + (extractedTextRaw || '(no text)');
 
-      if (hasMatch) {
+      // Robust matching: attempt several normalizations & fuzzy checks
+      let verified = false;
+      for (const t of TARGET_TEXTS) {
+        if (approximateMatch(extractedTextRaw, t)) {
+          verified = true;
+          break;
+        }
+      }
+
+      if (verified) {
         statusDiv.className = 'success';
         statusDiv.textContent = 'Verification successful!';
-        
+
         // Provide reward button
         resultArea.innerHTML = `
-          <a href="https://youtu.be/SUJlKZNuxRY" target="_blank" class="reward-btn">
+          <a href="https://youtu.be/SUJlKZNuxRY" target="_blank" class="reward-btn" rel="noopener noreferrer">
             Visit the Video on YouTube
           </a>
         `;
       } else {
         statusDiv.className = 'error';
-        statusDiv.textContent = 'Verification failed. Target term not found. Try again.';
+        statusDiv.textContent = 'Verification failed. Target term not confidently found. Try again with a clearer screenshot or crop to the query area.';
+
+        // Provide some hints to improve OCR
+        const hints = document.createElement('div');
+        hints.className = 'small';
+        hints.style.marginTop = '10px';
+        hints.innerHTML = `Helpful tips: crop the screenshot to the search query, ensure high contrast (dark text on light background), or zoom in on the text before taking the screenshot.`;
+        resultArea.appendChild(hints);
       }
     } catch (err) {
       console.error(err);
