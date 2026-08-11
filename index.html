@@ -281,35 +281,50 @@
       const imageUrl = URL.createObjectURL(file);
 
       // Create worker and follow Tesseract.js v5 initialization flow
-      const worker = Tesseract.createWorker();
+      // NOTE: some CDN/build variants expose createWorker as an async function that returns a Promise,
+      // and others return the worker synchronously. Handle both by awaiting only if necessary.
 
-      // Set a logger to update progress UI
-      if (worker.setLogger) {
-        worker.setLogger((m) => {
-          // m: { status, progress }
-          try {
-            if (m && typeof m === 'object' && 'progress' in m) {
-              const pct = Math.round((m.progress || 0) * 100);
-              progressContainer.style.display = 'block';
-              progressBar.style.width = pct + '%';
-              progressText.textContent = (m.status || 'processing') + ' — ' + pct + '%';
-              statusDiv.textContent = (m.status || 'processing') + ' — ' + pct + '%';
-            }
-          } catch (e) {
-            // ignore UI errors
+      // Provide logger directly to createWorker (many builds accept this). The logger updates the progress UI.
+      const logger = (m) => {
+        try {
+          if (m && typeof m === 'object' && 'progress' in m) {
+            const pct = Math.round((m.progress || 0) * 100);
+            progressContainer.style.display = 'block';
+            progressBar.style.width = pct + '%';
+            progressText.textContent = (m.status || 'processing') + ' — ' + pct + '%';
+            statusDiv.textContent = (m.status || 'processing') + ' — ' + pct + '%';
           }
-        });
+        } catch (e) {
+          // ignore UI errors
+        }
+      };
+
+      let maybeWorker;
+      try {
+        maybeWorker = Tesseract.createWorker({ logger });
+      } catch (e) {
+        // Some builds might throw on unknown options — fall back to no-arg createWorker
+        maybeWorker = Tesseract.createWorker();
       }
 
-      await worker.load();
-      await worker.loadLanguage('eng');
-      await worker.initialize('eng');
+      // If createWorker returned a Promise (thenable), await it
+      const worker = (maybeWorker && typeof maybeWorker.then === 'function') ? await maybeWorker : maybeWorker;
+
+      // If the worker has setLogger (older builds), ensure logger is set
+      if (worker && typeof worker.setLogger === 'function') {
+        worker.setLogger(logger);
+      }
+
+      // Now continue with the load/init/recognize flow
+      if (typeof worker.load === 'function') await worker.load();
+      if (typeof worker.loadLanguage === 'function') await worker.loadLanguage('eng');
+      if (typeof worker.initialize === 'function') await worker.initialize('eng');
 
       // Make recognition call; Tesseract will call the logger we set above
       const { data: { text } } = await worker.recognize(imageUrl);
 
       // Clean up worker and blob URL
-      await worker.terminate();
+      if (typeof worker.terminate === 'function') await worker.terminate();
       URL.revokeObjectURL(imageUrl);
 
       const extractedTextRaw = text || '';
