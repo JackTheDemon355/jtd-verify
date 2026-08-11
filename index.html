@@ -5,14 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Search History Verification</title>
 
-  <!-- Raleway font from Google Fonts; Calibri is a system font (not hosted on Google Fonts) -->
   <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;700&display=swap" rel="stylesheet">
-
-  <!-- Tesseract.js CDN for OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
-    /* Use Calibri first (system), then Raleway, then fallbacks */
     body {
       font-family: "Calibri", "Raleway", Arial, sans-serif;
       background-color: #1a1a1a;
@@ -30,163 +26,136 @@
       border-radius: 12px;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
       text-align: center;
-      max-width: 640px;
+      max-width: 760px;
       width: 94%;
     }
 
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-    }
+    h1 { font-size: 1.5rem; margin-bottom: 10px; }
+    p { color: #ccc; font-size: 0.95rem; line-height: 1.4; }
 
-    p {
-      color: #ccc;
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
+    .target-term { color: #ff4757; font-weight: bold; }
 
-    .target-term {
-      color: #ff4757;
-      font-weight: bold;
-    }
-
-    input[type="file"] {
-      display: none;
-    }
-
+    input[type="file"] { display: none; }
     .upload-btn {
-      display: inline-block;
-      margin-top: 18px;
-      padding: 12px 24px;
-      background-color: #3742fa;
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background 0.2s;
+      display: inline-block; margin-top: 12px; padding: 10px 20px;
+      background-color: #3742fa; color: white; border-radius: 6px; cursor: pointer; font-weight: bold;
     }
+    .upload-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
-    .upload-btn:hover {
-      background-color: #5352ed;
+    #dropZone {
+      margin-top: 12px; padding: 18px; border-radius: 8px; background: rgba(255,255,255,0.02);
+      border: 2px dashed rgba(255,255,255,0.03); color: #bbb;
     }
+    #dropZone.dragover { background: rgba(255,255,255,0.03); border-color: #3742fa; color: #fff; }
 
-    #status {
-      margin-top: 18px;
-      font-weight: bold;
-    }
+    #status { margin-top: 12px; font-weight: bold; min-height: 1.2em; }
+    .error { color: #ff6b6b; }
+    .success { color: #2ed573; }
 
-    .error {
-      color: #ff6b6b;
-    }
-
-    .success {
-      color: #2ed573;
-    }
-
-    .reward-btn {
-      display: inline-block;
-      margin-top: 15px;
-      padding: 12px 24px;
-      background-color: #2ed573;
-      color: #000;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: bold;
-      transition: background 0.2s;
-    }
-
-    .reward-btn:hover {
-      background-color: #26af5f;
-    }
+    .reward-btn { display:inline-block; margin-top:15px; padding:10px 16px; background:#2ed573; color:#000; border-radius:6px; font-weight:bold; text-decoration:none; }
+    .small { font-size: 0.85rem; color: #aaa; }
 
     #extractedText {
-      margin-top: 12px;
-      font-size: 0.85rem;
-      color: #ddd;
-      white-space: pre-wrap;
-      word-break: break-word;
-      text-align: left;
-      background: rgba(255,255,255,0.03);
-      padding: 10px;
-      border-radius: 6px;
-      max-height: 140px;
-      overflow: auto;
+      margin-top: 12px; font-size: 0.85rem; color: #ddd; white-space: pre-wrap; word-break: break-word;
+      text-align: left; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px;
+      max-height: 180px; overflow: auto; display: none;
     }
 
-    /* Progress bar styles */
-    .progress-container {
-      margin-top: 12px;
-      background: rgba(255,255,255,0.06);
-      border-radius: 8px;
-      height: 14px;
-      width: 100%;
-      overflow: hidden;
-    }
+    .progress-container { margin-top: 12px; background: rgba(255,255,255,0.06); border-radius: 8px; height: 14px; width: 100%; overflow: hidden; display:none; }
+    .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #3742fa, #2ed573); transition: width 120ms linear; }
+    .progress-text { margin-top: 6px; font-size: 0.85rem; color: #bbb; }
 
-    .progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #3742fa, #2ed573);
-      transition: width 120ms linear;
-    }
+    .controls { margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+    .btn { padding:8px 12px; border-radius:6px; background:#444; color:#fff; cursor:pointer; border:none; }
+    .btn.secondary { background:#666; }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
 
-    .progress-text {
-      margin-top: 6px;
-      font-size: 0.85rem;
-      color: #bbb;
-    }
-
-    .small {
-      font-size: 0.85rem;
-      color: #aaa;
-    }
+    .meta { margin-top:8px; color:#bbb; font-size:0.85rem; text-align:left; }
+    .inline { display:inline-block; vertical-align:middle; }
+    .word-list { text-align:left; max-height:150px; overflow:auto; margin-top:8px; background:rgba(255,255,255,0.02); padding:8px; border-radius:6px; color:#ddd; font-size:0.85rem; }
+    label.select { display:inline-block; margin-left:6px; }
   </style>
 </head>
 <body>
 
-  <div class="card">
+  <div class="card" role="region" aria-label="Search history verification card">
     <h1>Search History Verification</h1>
     <p>
-      Please open your search history, ensure the query 
+      Please open your search history, ensure the query
       <span class="target-term">"JackTheDemon355"</span> is visible, take a screenshot, and upload it below.
     </p>
 
-    <label for="imageInput" class="upload-btn">Upload Screenshot</label>
-    <input type="file" id="imageInput" accept="image/*" />
+    <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
+      <label for="imageInput" class="upload-btn" id="uploadLabel" role="button" tabindex="0">Upload Screenshot</label>
+      <input type="file" id="imageInput" accept="image/*" aria-describedby="fileHelp" />
+      <select id="langSelect" aria-label="OCR language">
+        <option value="eng" selected>English</option>
+        <option value="spa">Spanish</option>
+        <option value="fra">French</option>
+      </select>
+      <button id="cancelBtn" class="btn secondary" disabled>Cancel</button>
+    </div>
 
-    <div id="status" class="small"></div>
+    <div id="dropZone" tabindex="0" aria-label="Drag and drop image here or click Upload">Or drag & drop screenshot here</div>
+    <div id="fileHelp" class="small">Accepted types: images; max size: 8MB. The page will resize very large images for faster OCR.</div>
 
-    <div class="progress-container" style="display:none;" aria-hidden="true">
+    <div id="status" class="small" aria-live="polite"></div>
+
+    <div class="progress-container" aria-hidden="true">
       <div id="progressBar" class="progress-bar"></div>
     </div>
     <div id="progressText" class="progress-text" aria-live="polite"></div>
 
+    <div class="controls" aria-hidden="false">
+      <button id="showWordsBtn" class="btn" disabled>Show Words</button>
+      <button id="copyBtn" class="btn" disabled>Copy Text</button>
+      <button id="downloadBtn" class="btn" disabled>Download .txt</button>
+      <button id="retryBtn" class="btn" disabled>Retry Last</button>
+      <label class="select small inline"><input type="checkbox" id="detailedLogging"> Debug console</label>
+    </div>
+
     <div id="resultArea"></div>
-    <div id="extractedText" aria-live="polite" style="display:none;"></div>
+    <div id="extractedText" aria-live="polite"></div>
+    <div id="wordList" class="word-list" style="display:none;"></div>
+
   </div>
 
- <script>
+<script>
+  const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+  const MAX_DIMENSION = 1600; // longest side after resize
+  const TARGET_TEXTS = ["jackthedemon355","jtd355","windows 11","w11"];
+  let currentWorker = null;
+  let lastFile = null;
+  let currentAbort = false;
+  let fallbackProgressTimer = null;
+  let fallbackProgress = 0;
+
   const imageInput = document.getElementById('imageInput');
+  const uploadLabel = document.getElementById('uploadLabel');
+  const dropZone = document.getElementById('dropZone');
   const statusDiv = document.getElementById('status');
   const resultArea = document.getElementById('resultArea');
   const extractedTextDiv = document.getElementById('extractedText');
   const progressBar = document.getElementById('progressBar');
   const progressContainer = document.querySelector('.progress-container');
   const progressText = document.getElementById('progressText');
+  const langSelect = document.getElementById('langSelect');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const showWordsBtn = document.getElementById('showWordsBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const retryBtn = document.getElementById('retryBtn');
+  const detailedLogging = document.getElementById('detailedLogging');
+  const wordListDiv = document.getElementById('wordList');
 
-  // Array of keywords (lowercase)
-  const TARGET_TEXTS = [
-    "jackthedemon355",
-    "jtd355",
-    "windows 11",
-    "w11"
-  ];
+  function logDebug(...args) {
+    if (detailedLogging.checked) console.debug('[OCR DEBUG]', ...args);
+  }
 
-  // Simple Levenshtein distance for fuzzy matching
+  // Levenshtein
   function levenshtein(a, b) {
     if (a === b) return 0;
-    const al = a.length;
-    const bl = b.length;
+    const al = a.length, bl = b.length;
     if (al === 0) return bl;
     if (bl === 0) return al;
     const matrix = Array.from({ length: al + 1 }, () => Array(bl + 1).fill(0));
@@ -205,170 +174,329 @@
     return matrix[al][bl];
   }
 
-  // Normalize text: remove diacritics, punctuation (keep letters & numbers & spaces), collapse whitespace
+  // Normalize text
   function normalizeText(s) {
     if (!s) return '';
-    // remove diacritics
     let t = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
-    // replace non-alphanumeric with spaces
     t = t.replace(/[^a-zA-Z0-9\s]/g, ' ');
-    // collapse whitespace
     t = t.replace(/\s+/g, ' ').trim().toLowerCase();
     return t;
   }
 
-  // Replace common OCR confusions (0<->o, 1<->l, 5<->s)
+  // OCR confusion mappings (extended)
   function ocrNormalizeConfusions(s) {
     return s
+      .replace(/\|/g, 'l')
       .replace(/0/g, 'o')
-      .replace(/\b1\b/g, '1') // keep standalone 1 as-is
       .replace(/1/g, 'l')
       .replace(/5/g, 's')
-      .replace(/\$/g, 's');
+      .replace(/@/g, 'a')
+      .replace(/\$/g, 's')
+      .replace(/!/g, 'i');
   }
 
-  // Try approximate match: direct substring, token n-grams, and fuzzy (levenshtein) checks
   function approximateMatch(extracted, target) {
     if (!extracted || !target) return false;
     const normExtracted = normalizeText(extracted);
     const normTarget = normalizeText(target);
-    // direct substring
     if (normExtracted.includes(normTarget)) return true;
-
-    // try OCR confusion mappings
     const mapped = ocrNormalizeConfusions(normExtracted);
     if (mapped.includes(normTarget)) return true;
 
-    // split into tokens
     const tokens = normExtracted.split(' ');
-    const maxN = Math.min(4, tokens.length);
-    const threshold = Math.max(1, Math.floor(normTarget.length * 0.25)); // allow ~25% errors
+    const maxN = Math.min(5, tokens.length);
+    const threshold = Math.max(1, Math.floor(normTarget.length * 0.25));
 
-    // build n-grams and compare
     for (let n = 1; n <= maxN; n++) {
       for (let i = 0; i + n <= tokens.length; i++) {
-        const candidate = tokens.slice(i, i + n).join(''); // join without spaces
-        // direct equality
+        const candidate = tokens.slice(i, i + n).join('');
         if (candidate === normTarget) return true;
         const dist = levenshtein(candidate, normTarget);
         if (dist <= threshold) return true;
       }
     }
 
-    // As a last resort compare full text with target
-    const fullDist = levenshtein(normExtracted.replace(/\s+/g, ''), normTarget);
+    const fullDist = levenshtein(normExtracted.replace(/\s+/g,''), normTarget);
     if (fullDist <= threshold) return true;
 
     return false;
   }
 
-  imageInput.addEventListener('change', async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  function setStatus(text, cls='') {
+    statusDiv.className = cls ? cls : 'small';
+    statusDiv.textContent = text;
+  }
 
-    // Reset state
-    statusDiv.className = '';
-    statusDiv.textContent = 'Preparing image for OCR...';
-    resultArea.innerHTML = '';
-    extractedTextDiv.style.display = 'none';
-    extractedTextDiv.textContent = '';
+  // Resize image via canvas to prevent sending huge images to Tesseract
+  async function resizeImageFile(file, maxDim=MAX_DIMENSION) {
+    const imgBitmap = await createImageBitmap(file);
+    const { width, height } = imgBitmap;
+    let w = width, h = height;
+    const scale = Math.min(1, maxDim / Math.max(w, h));
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgBitmap, 0, 0, w, h);
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+  }
+
+  // Create a worker safely (never pass functions into options)
+  async function createTesseractWorker() {
+    // Always create without options to avoid DataCloneError
+    let maybeWorker = Tesseract.createWorker();
+    const worker = (maybeWorker && typeof maybeWorker.then === 'function') ? await maybeWorker : maybeWorker;
+    return worker;
+  }
+
+  function updateProgressUI(m) {
+    if (m && typeof m === 'object' && 'progress' in m) {
+      const pct = Math.round((m.progress || 0) * 100);
+      progressContainer.style.display = 'block';
+      progressBar.style.width = pct + '%';
+      progressText.textContent = (m.status || 'processing') + ' — ' + pct + '%';
+      setStatus((m.status || 'processing') + ' — ' + pct + '%');
+      // stop fallback if real progress seen
+      if (fallbackProgressTimer) { clearInterval(fallbackProgressTimer); fallbackProgressTimer = null; fallbackProgress = 0; }
+    }
+  }
+
+  function startFallbackProgress() {
+    if (fallbackProgressTimer) return;
+    fallbackProgress = 0;
+    progressContainer.style.display = 'block';
     progressBar.style.width = '0%';
-    progressContainer.style.display = 'none';
-    progressText.textContent = '';
+    progressText.textContent = 'processing — 0%';
+    fallbackProgressTimer = setInterval(() => {
+      fallbackProgress = Math.min(95, fallbackProgress + Math.random()*10);
+      progressBar.style.width = Math.round(fallbackProgress) + '%';
+      progressText.textContent = 'processing — ' + Math.round(fallbackProgress) + '% (estimated)';
+      setStatus('processing — ' + Math.round(fallbackProgress) + '% (estimated)');
+    }, 700);
+  }
+
+  async function runOCRFile(file) {
+    // validations
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setStatus('File is not an image.', 'error');
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setStatus('File too large (>8MB). Crop or reduce image size.', 'error');
+      return;
+    }
+
+    lastFile = file;
+    toggleUIProcessing(true);
 
     try {
-      // Create a blob URL and pass that to Tesseract (more reliable)
-      const imageUrl = URL.createObjectURL(file);
-
-      // Create worker and follow Tesseract.js v5 initialization flow
-      // NOTE: some CDN/build variants expose createWorker as an async function that returns a Promise,
-      // and others return the worker synchronously. Handle both by awaiting only if necessary.
-
-      // Provide logger directly to createWorker (many builds accept this). The logger updates the progress UI.
-      const logger = (m) => {
-        try {
-          if (m && typeof m === 'object' && 'progress' in m) {
-            const pct = Math.round((m.progress || 0) * 100);
-            progressContainer.style.display = 'block';
-            progressBar.style.width = pct + '%';
-            progressText.textContent = (m.status || 'processing') + ' — ' + pct + '%';
-            statusDiv.textContent = (m.status || 'processing') + ' — ' + pct + '%';
-          }
-        } catch (e) {
-          // ignore UI errors
+      setStatus('Preparing image for OCR...');
+      // Resize image for performance and reliability
+      let blobToUse = file;
+      if (file.size > 512 * 1024 || Math.max(file.width || 0, file.height || 0) > MAX_DIMENSION) {
+        const resizedBlob = await resizeImageFile(file);
+        if (resizedBlob) {
+          blobToUse = new File([resizedBlob], file.name, { type: resizedBlob.type || 'image/jpeg' });
+          logDebug('image resized from', file.size, 'to', blobToUse.size);
         }
-      };
+      }
 
-      let maybeWorker;
+      // create blob URL
+      const imageUrl = URL.createObjectURL(blobToUse);
+
+      // prepare logger but do not pass into createWorker
+      const logger = (m) => { try { updateProgressUI(m); } catch(e) { /* ignore UI errors */ } };
+
+      // create worker safely
+      currentWorker = await createTesseractWorker();
+      if (!currentWorker) throw new Error('Failed to create Tesseract worker');
+
+      // set logger if available (safe - not cloning into worker)
+      if (typeof currentWorker.setLogger === 'function') {
+        try { currentWorker.setLogger(logger); }
+        catch(e) { logDebug('setLogger failed', e); }
+      }
+
+      // fallback progress if logger isn't called
+      startFallbackProgress();
+
+      // load/init language
+      if (typeof currentWorker.load === 'function') await currentWorker.load();
+      const lang = langSelect.value || 'eng';
+      if (typeof currentWorker.loadLanguage === 'function') await currentWorker.loadLanguage(lang);
+      if (typeof currentWorker.initialize === 'function') await currentWorker.initialize(lang);
+
+      // keep UI cancelable
+      cancelBtn.disabled = false;
+
+      // actual recognition
+      const recognizeResult = await currentWorker.recognize(imageUrl);
+
+      // compute average confidence if available
+      let avgConfidence = null;
       try {
-        maybeWorker = Tesseract.createWorker({ logger });
-      } catch (e) {
-        // Some builds might throw on unknown options — fall back to no-arg createWorker
-        maybeWorker = Tesseract.createWorker();
-      }
+        const words = (recognizeResult && recognizeResult.data && recognizeResult.data.words) ? recognizeResult.data.words : [];
+        if (words.length > 0) {
+          const sum = words.reduce((s, w) => s + (w.confidence || 0), 0);
+          avgConfidence = Math.round(sum / words.length);
+        }
+      } catch (e) { logDebug('confidence calc failed', e); }
 
-      // If createWorker returned a Promise (thenable), await it
-      const worker = (maybeWorker && typeof maybeWorker.then === 'function') ? await maybeWorker : maybeWorker;
-
-      // If the worker has setLogger (older builds), ensure logger is set
-      if (worker && typeof worker.setLogger === 'function') {
-        worker.setLogger(logger);
-      }
-
-      // Now continue with the load/init/recognize flow
-      if (typeof worker.load === 'function') await worker.load();
-      if (typeof worker.loadLanguage === 'function') await worker.loadLanguage('eng');
-      if (typeof worker.initialize === 'function') await worker.initialize('eng');
-
-      // Make recognition call; Tesseract will call the logger we set above
-      const { data: { text } } = await worker.recognize(imageUrl);
-
-      // Clean up worker and blob URL
-      if (typeof worker.terminate === 'function') await worker.terminate();
+      // finalize
+      if (typeof currentWorker.terminate === 'function') { await currentWorker.terminate(); }
+      currentWorker = null;
       URL.revokeObjectURL(imageUrl);
 
-      const extractedTextRaw = text || '';
+      // stop fallback
+      if (fallbackProgressTimer) { clearInterval(fallbackProgressTimer); fallbackProgressTimer = null; fallbackProgress = 0; }
 
-      // Show the extracted text for debugging/visibility
+      const extractedTextRaw = recognizeResult && recognizeResult.data ? (recognizeResult.data.text || '') : '';
       extractedTextDiv.style.display = 'block';
-      extractedTextDiv.textContent = 'Extracted text:\n' + (extractedTextRaw || '(no text)');
+      extractedTextDiv.textContent = extractedTextRaw ? ('Extracted text:\n' + extractedTextRaw) : '(no text)';
 
-      // Robust matching: attempt several normalizations & fuzzy checks
+      // prepare word list UI
+      const words = (recognizeResult && recognizeResult.data && recognizeResult.data.words) ? recognizeResult.data.words : [];
+      wordListDiv.style.display = 'none';
+      wordListDiv.innerHTML = words.length ? words.map(w => `<div>${w.text} — ${Math.round(w.confidence || 0)}%</div>`).join('') : '';
+
+      // Matching target terms (fuzzy)
       let verified = false;
       for (const t of TARGET_TEXTS) {
-        if (approximateMatch(extractedTextRaw, t)) {
-          verified = true;
-          break;
-        }
+        if (approximateMatch(extractedTextRaw, t)) { verified = true; break; }
       }
 
       if (verified) {
-        statusDiv.className = 'success';
-        statusDiv.textContent = 'Verification successful!';
-
-        // Provide reward button
-        resultArea.innerHTML = `
-          <a href="https://youtu.be/SUJlKZNuxRY" target="_blank" class="reward-btn" rel="noopener noreferrer">
-            Visit the Video on YouTube
-          </a>
-        `;
+        setStatus('Verification successful!' + (avgConfidence !== null ? ` (avg confidence ${avgConfidence}%)` : ''), 'success');
+        resultArea.innerHTML = `<a href="https://youtu.be/SUJlKZNuxRY" target="_blank" class="reward-btn" rel="noopener noreferrer">Visit the Video on YouTube</a>`;
       } else {
-        statusDiv.className = 'error';
-        statusDiv.textContent = 'Verification failed. Target term not confidently found. Try again with a clearer screenshot or crop to the query area.';
-
-        // Provide some hints to improve OCR
+        setStatus('Verification failed. Target term not confidently found.' + (avgConfidence !== null ? ` (avg confidence ${avgConfidence}%)` : ''), 'error');
         const hints = document.createElement('div');
         hints.className = 'small';
         hints.style.marginTop = '10px';
-        hints.innerHTML = `Helpful tips: crop the screenshot to the search query, ensure high contrast (dark text on light background), or zoom in on the text before taking the screenshot.`;
+        hints.innerHTML = `Helpful tips: crop the screenshot to the search query, increase contrast, or zoom in on the text before taking the screenshot.`;
         resultArea.appendChild(hints);
       }
+
+      showWordsBtn.disabled = words.length === 0;
+      copyBtn.disabled = !extractedTextRaw;
+      downloadBtn.disabled = !extractedTextRaw;
+      retryBtn.disabled = false;
+
     } catch (err) {
-      console.error(err);
-      statusDiv.className = 'error';
-      statusDiv.textContent = 'An error occurred while processing the image. Please try again.';
+      logDebug('OCR error', err);
+      setStatus('An error occurred while processing the image: ' + (err && err.message ? err.message : ''), 'error');
+      if (currentWorker && typeof currentWorker.terminate === 'function') {
+        try { await currentWorker.terminate(); } catch(e) { /* ignore */ }
+        currentWorker = null;
+      }
+    } finally {
+      toggleUIProcessing(false);
+    }
+  }
+
+  function toggleUIProcessing(isProcessing) {
+    if (isProcessing) {
+      uploadLabel.setAttribute('aria-disabled','true');
+      uploadLabel.classList.add('disabled');
+      uploadLabel.style.pointerEvents = 'none';
+      uploadLabel.style.opacity = '0.6';
+      progressContainer.style.display = 'block';
+    } else {
+      uploadLabel.removeAttribute('aria-disabled');
+      uploadLabel.style.pointerEvents = '';
+      uploadLabel.style.opacity = '';
+      cancelBtn.disabled = true;
+      progressContainer.style.display = 'none';
+      progressBar.style.width = '0%';
+      progressText.textContent = '';
+    }
+  }
+
+  // Event handlers
+  imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) runOCRFile(file);
+  });
+
+  // Make label clickable by keyboard
+  uploadLabel.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') imageInput.click(); });
+  uploadLabel.addEventListener('click', () => imageInput.click());
+
+  // Drag & drop
+  ['dragenter','dragover'].forEach(evt => {
+    dropZone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('dragover'); });
+  });
+  ['dragleave','drop','dragend'].forEach(evt => {
+    dropZone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('dragover'); });
+  });
+  dropZone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) runOCRFile(file);
+  });
+  dropZone.addEventListener('click', () => imageInput.click());
+
+  // Cancel
+  cancelBtn.addEventListener('click', async () => {
+    if (currentWorker && typeof currentWorker.terminate === 'function') {
+      currentAbort = true;
+      setStatus('Cancelling...', 'small');
+      try { await currentWorker.terminate(); } catch (e) { /* ignore */ }
+      currentWorker = null;
+      toggleUIProcessing(false);
+      setStatus('Cancelled.', 'error');
     }
   });
+
+  // Show/Hide word list
+  showWordsBtn.addEventListener('click', () => {
+    if (wordListDiv.style.display === 'none') { wordListDiv.style.display = 'block'; showWordsBtn.textContent = 'Hide Words'; }
+    else { wordListDiv.style.display = 'none'; showWordsBtn.textContent = 'Show Words'; }
+  });
+
+  // Copy extracted text
+  copyBtn.addEventListener('click', async () => {
+    const txt = extractedTextDiv.textContent.replace(/^Extracted text:\n/, '');
+    try {
+      await navigator.clipboard.writeText(txt);
+      setStatus('Extracted text copied to clipboard.', 'success');
+    } catch (e) {
+      setStatus('Copy failed: ' + (e && e.message ? e.message : ''), 'error');
+    }
+  });
+
+  // Download .txt
+  downloadBtn.addEventListener('click', () => {
+    const txt = extractedTextDiv.textContent.replace(/^Extracted text:\n/, '');
+    const blob = new Blob([txt], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'extracted.txt'; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    setStatus('Downloaded extracted text.', 'small');
+  });
+
+  // Retry last
+  retryBtn.addEventListener('click', () => {
+    if (lastFile) runOCRFile(lastFile);
+  });
+
+  // Keyboard accessibility for drop zone
+  dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') imageInput.click(); });
+
+  // initial UI state
+  (function init() {
+    setStatus('Ready.');
+    cancelBtn.disabled = true;
+    showWordsBtn.disabled = true;
+    copyBtn.disabled = true;
+    downloadBtn.disabled = true;
+    retryBtn.disabled = true;
+  })();
+
 </script>
 
 </body>
